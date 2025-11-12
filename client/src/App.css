@@ -1,0 +1,76 @@
+
+html {
+  height: 100%;
+}
+body {
+  height: 90%;
+}
+
+.root {
+    height: 100%;
+}
+
+.viewerTop {
+    .results {
+        display: flex;
+        flex-direction: column;
+        border: solid 3px gray;
+
+        .division {
+            display: flex;
+            flex-direction: column;
+            border: solid 5px lightblue;
+
+            .divisionHeader {
+                background-color: lightblue;
+                font-weight: bold;
+                font-size: 1.1em;
+                padding-top: 5px;
+                padding-bottom: 5px;
+            }
+
+            .round {
+                display: flex;
+                flex-direction: column;
+                border: solid 5px lightpink;
+
+                .roundHeader {
+                    background-color: lightpink;
+                    font-weight: bold;
+                    font-size: 1.1em;
+                    padding-top: 5px;
+                    padding-bottom: 5px;
+                }
+
+                .pool {
+                    display: flex;
+                    flex-direction: column;
+                    border: solid 5px lightgreen;
+
+                    .poolHeader {
+                        background-color: lightgreen;
+                        font-weight: bold;
+                        font-size: 1.1em;
+                        padding-top: 5px;
+                        padding-bottom: 5px;
+                    }
+
+                    .team {
+                        display: flex;
+                        flex-direction: row;
+                    }
+
+                    td {
+                        border: 1px solid black;
+                    }
+
+                    table {
+                        border-collapse: collapse; 
+                        table-layout: auto;
+                        width: auto;
+                    }
+                }
+            }
+        }
+    }
+}
