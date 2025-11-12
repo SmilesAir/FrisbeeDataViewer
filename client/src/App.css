@@ -55,9 +55,10 @@ body {
                         padding-bottom: 5px;
                     }
 
-                    .team {
-                        display: flex;
-                        flex-direction: row;
+                    .playersWidget {
+                        a:visited{
+                            color:blue;
+                        }
                     }
 
                     td {

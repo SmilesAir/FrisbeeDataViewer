@@ -24,12 +24,40 @@ const EventViewer = observer(class EventViewer extends React.Component {
         super()
     }
 
+    onPlayerClick(e, playerKey) {
+        e.preventDefault()
+
+        MainStore.selectedPlayerKey = playerKey
+        MainStore.topTabSelectedIndex = 0
+    }
+
+    getPlayersWidget(players) {
+        let playerWidgets = players.map((data) => {
+            return <a key={data} href="" onClick={(e) => this.onPlayerClick(e, data)}>{Common.getPlayerNameString(data)}</a>
+        })
+
+        let playersCount = players.length
+        let widgets = []
+        for (let i = 0; i < playersCount; ++i) {
+            widgets.push(playerWidgets[i])
+            if (i < playersCount - 1) {
+                widgets.push(" - ")
+            }
+        }
+
+        return (
+            <div className="playersWidget">
+                {widgets}
+            </div>
+        )
+    }
+
     getPoolWidget(poolData) {
         let teamRows = poolData.teamData.map((data) => {
             return (
                 <tr key={data.place}>
                     <td>{data.place}</td>
-                    <td>{Common.getPlayerNamesString(data.players)}</td>
+                    <td>{this.getPlayersWidget(data.players)}</td>
                     <td>{data.points}</td>
                 </tr>
             )
@@ -255,17 +283,50 @@ const App = observer(class App extends React.Component {
     constructor() {
         super()
 
+        let topTabSelectedIndex = 0
+        let url = new URL(window.location.href)
+        let playerKey = url.searchParams.get("playerKey")
+        if (playerKey) {
+            MainStore.selectedPlayerKey = playerKey
+        }
+        else
+        {
+            let eventKey = url.searchParams.get("eventKey")
+            if (eventKey) {
+                topTabSelectedIndex = 1
+                MainStore.selectedEventKey = eventKey
+            }
+        }
+
+        MainStore.topTabSelectedIndex = topTabSelectedIndex
+
         MainStore.inited = false
         Common.downloadAllData().then(() => {
             MainStore.inited = true
         })
     }
 
+    onTopTabSelectedChanged(e) {
+        MainStore.topTabSelectedIndex = e
+    }
+
+    getLoadingWidget() {
+        return (
+            <div>
+                <h2>Loading...</h2>
+            </div>
+        )
+    }
+
     render() {
+        if (MainStore.inited !== true) {
+            return this.getLoadingWidget()
+        }
+
         return (
             <div className="viewerTop">
                 <h2>Frisbee Data Viewer</h2>
-                <Tabs selectedIndex={0}>
+                <Tabs selectedIndex={MainStore.topTabSelectedIndex} onSelect={(e) => this.onTopTabSelectedChanged(e)}>
                     <TabList>
                         <Tab>Players</Tab>
                         <Tab>Events</Tab>
