@@ -10,9 +10,49 @@ body {
     height: 100%;
 }
 
+.loadingTop {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    .outer {
+        width: 90%;
+        height: 2.5em;
+
+        border: 8px black solid;
+        border-radius: 6px;
+
+        .inner {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            width: 0%;
+            height: 100%;
+            background-color: bisque;
+        }
+    }
+
+    .per {
+        position: absolute;
+        font-size: 1.8em;
+        font-weight: bold;
+    }
+}
+
 .viewerTop {
     a:visited{
         color:blue;
+    }
+
+    td {
+        border: 1px solid black;
+    }
+
+    table {
+        border-collapse: collapse; 
+        table-layout: auto;
+        width: auto;
     }
 
     .results {
@@ -57,16 +97,6 @@ body {
                         font-size: 1.1em;
                         padding-top: 5px;
                         padding-bottom: 5px;
-                    }
-
-                    td {
-                        border: 1px solid black;
-                    }
-
-                    table {
-                        border-collapse: collapse; 
-                        table-layout: auto;
-                        width: auto;
                     }
                 }
             }

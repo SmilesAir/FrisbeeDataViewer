@@ -15,8 +15,13 @@ import MainStore from "./mainStore.js"
 if (import.meta.hot) {
     import.meta.hot.on(
       "vite:beforeUpdate",
-      () => console.clear()
-    );
+      () => {
+        console.clear()
+        runInAction(() => {
+            MainStore.startedInit = false
+        })
+      }
+    )
 }
 
 function getPlayersWidget(players, onclick) {
@@ -184,18 +189,9 @@ const EventViewer = observer(class EventViewer extends React.Component {
             }
         }
 
-        let eventSummaryOptions = []
-        for (let eventKey in MainStore.eventSummaryData) {
-            let data = MainStore.eventSummaryData[eventKey]
-            eventSummaryOptions.push({
-                value: eventKey,
-                label: data.eventName
-            })
-        }
-
         return (
             <div className="results">
-                <ReactSelect value={selectedEventValue} options={eventSummaryOptions} onChange={(e) => this.onSelectEventChanged(e)}/>
+                <ReactSelect value={selectedEventValue} options={MainStore.sortedEventSummaryOptions} onChange={(e) => this.onSelectEventChanged(e)}/>
                 {this.getResultsWidget()}
             </div>
         )
@@ -391,11 +387,16 @@ const App = observer(class App extends React.Component {
             MainStore.inited = false
         })
 
-        Common.downloadAllData().then(() => {
+        if (!MainStore.startedInit) {
             runInAction(() => {
-                MainStore.inited = true
+                MainStore.startedInit = true
             })
-        })
+            Common.downloadAllData().then(() => {
+                runInAction(() => {
+                    MainStore.inited = true
+                })
+            })
+        }
     }
 
     onTopTabSelectedChanged(e) {
@@ -405,9 +406,15 @@ const App = observer(class App extends React.Component {
     }
 
     getLoadingWidget() {
+        let loadingPercent = MainStore.initCount / 4 * 100
         return (
-            <div>
-                <h2>Loading...</h2>
+            <div className="loadingTop">
+                <div className="outer">
+                    <div className="inner" style={{width: `${loadingPercent}%`}}/>
+                </div>
+                <div className="per">
+                    Loading {loadingPercent}%
+                </div>
             </div>
         )
     }
@@ -419,7 +426,6 @@ const App = observer(class App extends React.Component {
 
         return (
             <div className="viewerTop">
-                <h2>Frisbee Data Viewer</h2>
                 <Tabs selectedIndex={MainStore.topTabSelectedIndex} onSelect={(e) => this.onTopTabSelectedChanged(e)}>
                     <TabList>
                         <Tab>Players</Tab>

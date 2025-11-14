@@ -3,6 +3,7 @@
 
 import MainStore from "./mainStore.js"
 import buildUrl from "./endpoints.js"
+import { runInAction } from "mobx"
 
 const poolKeyPrefix = "pool|"
 let Common = {}
@@ -35,6 +36,10 @@ Common.fetchEx = function(key, pathParams, queryParams, options) {
 }
 
 Common.downloadAllData = function() {
+    runInAction(() => {
+        MainStore.initCount = 0
+    })
+
     let playerDataPomise = Common.fetchEx("GET_PLAYER_DATA", {}, {}, {
         method: "GET",
         headers: {
@@ -49,6 +54,10 @@ Common.downloadAllData = function() {
             let playerData = MainStore.playerData[id]
             MainStore.cachedFullNames.push(playerData.firstName + " " + playerData.lastName)
         }
+
+        runInAction(() => {
+            ++MainStore.initCount
+        })
     }).catch((error) => {
         console.error(`Failed to download Player data: ${error}`)
     })
@@ -61,7 +70,22 @@ Common.downloadAllData = function() {
     }).then((data) => {
         MainStore.eventSummaryData = data.allEventSummaryData
 
+        let eventSummaryOptions = []
+        for (let eventKey in MainStore.eventSummaryData) {
+            let data = MainStore.eventSummaryData[eventKey]
+            eventSummaryOptions.push({
+                value: eventKey,
+                label: data.eventName,
+                startDate: data.startDate
+            })
+        }
+        eventSummaryOptions.sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
+        MainStore.sortedEventSummaryOptions = eventSummaryOptions
+
         console.log("GET_EVENT_SUMMARY_DATA", data.allEventSummaryData)
+        runInAction(() => {
+            ++MainStore.initCount
+        })
     }).catch((error) => {
         console.error(`Failed to download Event data: ${error}`)
     })
@@ -74,6 +98,9 @@ Common.downloadAllData = function() {
     }).then((data) => {
         MainStore.resultsData = data.results
         console.log("GET_RESULTS_DATA", data.results)
+        runInAction(() => {
+            ++MainStore.initCount
+        })
     }).catch((error) => {
         console.error(`Failed to download Results data: ${error}`)
     })
@@ -86,6 +113,9 @@ Common.downloadAllData = function() {
     }).then((data) => {
         console.log("GET_POINTS_DATA", data)
         MainStore.pointsData = data.data
+        runInAction(() => {
+            ++MainStore.initCount
+        })
     }).catch((error) => {
         console.error(`Failed to download points data: ${error}`)
     })

@@ -4,13 +4,14 @@ import { observable } from "mobx"
 
 export default observable({
     selectedEventKey: undefined,
+    selectedPlayerKey: undefined,
     eventData: undefined,
     resultsData: undefined,
-    isPlayerMainWidgetEnabled: false,
     playerData: {},
     eventSummaryData: undefined,
+    sortedEventSummaryOptions: [],
     pointsData: undefined,
-    cachedFullNames: [],
-    cachedRegisteredFullNames: [],
-    startup: undefined
+    initCount: 0,
+    inited: false,
+    startedInit: false
 })
