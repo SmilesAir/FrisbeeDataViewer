@@ -19,6 +19,31 @@ if (import.meta.hot) {
     );
 }
 
+function getPlayersWidget(players, onclick) {
+    if (players === undefined) {
+        return <div className="playersWidget"/>
+    }
+
+    let playerWidgets = players.map((data) => {
+        return <a key={data} href="" onClick={(e) => onclick(e, data)}>{Common.getPlayerNameString(data)}</a>
+    })
+
+    let playersCount = players.length
+    let widgets = []
+    for (let i = 0; i < playersCount; ++i) {
+        widgets.push(playerWidgets[i])
+        if (i < playersCount - 1) {
+            widgets.push(" - ")
+        }
+    }
+
+    return (
+        <div className="playersWidget">
+            {widgets}
+        </div>
+    )
+}
+
 const EventViewer = observer(class EventViewer extends React.Component {
     constructor() {
         super()
@@ -27,29 +52,10 @@ const EventViewer = observer(class EventViewer extends React.Component {
     onPlayerClick(e, playerKey) {
         e.preventDefault()
 
-        MainStore.selectedPlayerKey = playerKey
-        MainStore.topTabSelectedIndex = 0
-    }
-
-    getPlayersWidget(players) {
-        let playerWidgets = players.map((data) => {
-            return <a key={data} href="" onClick={(e) => this.onPlayerClick(e, data)}>{Common.getPlayerNameString(data)}</a>
+        runInAction(() => {
+            MainStore.selectedPlayerKey = playerKey
+            MainStore.topTabSelectedIndex = 0
         })
-
-        let playersCount = players.length
-        let widgets = []
-        for (let i = 0; i < playersCount; ++i) {
-            widgets.push(playerWidgets[i])
-            if (i < playersCount - 1) {
-                widgets.push(" - ")
-            }
-        }
-
-        return (
-            <div className="playersWidget">
-                {widgets}
-            </div>
-        )
     }
 
     getPoolWidget(poolData) {
@@ -57,7 +63,7 @@ const EventViewer = observer(class EventViewer extends React.Component {
             return (
                 <tr key={data.place}>
                     <td>{data.place}</td>
-                    <td>{this.getPlayersWidget(data.players)}</td>
+                    <td>{getPlayersWidget(data.players, (e, playerKey) => this.onPlayerClick(e, playerKey))}</td>
                     <td>{data.points}</td>
                 </tr>
             )
@@ -159,11 +165,13 @@ const EventViewer = observer(class EventViewer extends React.Component {
     }
 
     onSelectEventChanged(selected) {
-        MainStore.selectedEventKey = selected.value
+        runInAction(() => {
+            MainStore.selectedEventKey = selected.value
 
-        if (MainStore.eventData !== undefined) {
-            MainStore.eventData.eventName = selected.label
-        }
+            if (MainStore.eventData !== undefined) {
+                MainStore.eventData.eventName = selected.label
+            }
+        })
     }
 
     render() {
@@ -197,6 +205,15 @@ const EventViewer = observer(class EventViewer extends React.Component {
 const PlayerViewer = observer(class PlayerViewer extends React.Component {
     constructor() {
         super()
+    }
+
+    onPlayerClick(e, playerKey) {
+        e.preventDefault()
+
+        runInAction(() => {
+            MainStore.selectedPlayerKey = playerKey
+            MainStore.topTabSelectedIndex = 0
+        })
     }
 
     getPlayerStatsWidget(playerId) {
@@ -236,12 +253,80 @@ const PlayerViewer = observer(class PlayerViewer extends React.Component {
         )
     }
 
-    onSelectPlayerChanged(selected) {
-        MainStore.selectedPlayerKey = selected.value
-
-        if (MainStore.eventData !== undefined) {
-            MainStore.eventData.eventName = selected.label
+    getSortedPlayers(firstPlayerId, players) {
+        if (players === undefined) {
+            return players
         }
+
+        if (players.length === 0) {
+            return players
+        }
+
+        if (players[0] === firstPlayerId) {
+            return players
+        }
+
+        let ret = players.slice()
+        let index = players.findIndex((data) => data === firstPlayerId)
+        if (index >= 0) {
+            ret.splice(index, 1)
+            ret.splice(0, 0, firstPlayerId)
+        }
+
+        return ret
+    }
+
+    onClickEvent(e, eventKey) {
+        e.preventDefault()
+
+        runInAction(() => {
+            MainStore.selectedEventKey = eventKey
+            MainStore.topTabSelectedIndex = 1
+        })
+    }
+
+    getPlayerEventsWidget(playerId) {
+        let details = Common.getPlayerEventDetails(playerId)
+        let rows = details.map((data) => {
+            return (
+                <tr key={Math.random()}>
+                    <td>{data.startDate}</td>
+                    <td><a key={data} href="" onClick={(e) => this.onClickEvent(e, data.eventId)}>{data.eventName}</a></td>
+                    <td>{data.divisionName}</td>
+                    <td>{data.place}</td>
+                    <td>{getPlayersWidget(this.getSortedPlayers(playerId, data.players), (e, playerKey) => this.onPlayerClick(e, playerKey))}</td>
+                </tr>
+            )
+        })
+
+        return (
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Start Date</th>
+                            <th>Event Name</th>
+                            <th>Division Name</th>
+                            <th>Place</th>
+                            <th>Team</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows}
+                    </tbody>
+                </table>
+            </div>
+        )
+    }
+
+    onSelectPlayerChanged(selected) {
+        runInAction(() => {
+            MainStore.selectedPlayerKey = selected.value
+
+            if (MainStore.eventData !== undefined) {
+                MainStore.eventData.eventName = selected.label
+            }
+        })
     }
 
     render() {
@@ -273,6 +358,7 @@ const PlayerViewer = observer(class PlayerViewer extends React.Component {
             <div>
                 <ReactSelect value={selectedPlayerValue} options={playerOptions} onChange={(e) => this.onSelectPlayerChanged(e)}/>
                 {this.getPlayerStatsWidget(MainStore.selectedPlayerKey)}
+                {this.getPlayerEventsWidget(MainStore.selectedPlayerKey)}
             </div>
         )
     }
@@ -287,7 +373,9 @@ const App = observer(class App extends React.Component {
         let url = new URL(window.location.href)
         let playerKey = url.searchParams.get("playerKey")
         if (playerKey) {
-            MainStore.selectedPlayerKey = playerKey
+            runInAction(() => {
+                MainStore.selectedPlayerKey = playerKey
+            })
         }
         else
         {
@@ -298,16 +386,22 @@ const App = observer(class App extends React.Component {
             }
         }
 
-        MainStore.topTabSelectedIndex = topTabSelectedIndex
+        runInAction(() => {
+            MainStore.topTabSelectedIndex = topTabSelectedIndex
+            MainStore.inited = false
+        })
 
-        MainStore.inited = false
         Common.downloadAllData().then(() => {
-            MainStore.inited = true
+            runInAction(() => {
+                MainStore.inited = true
+            })
         })
     }
 
     onTopTabSelectedChanged(e) {
-        MainStore.topTabSelectedIndex = e
+        runInAction(() => {
+            MainStore.topTabSelectedIndex = e
+        })
     }
 
     getLoadingWidget() {

@@ -1,8 +1,6 @@
 /* eslint-disable no-alert */
 "use strict"
 
-//const StringSimilarity = require("string-similarity")
-
 import MainStore from "./mainStore.js"
 import buildUrl from "./endpoints.js"
 
@@ -37,7 +35,7 @@ Common.fetchEx = function(key, pathParams, queryParams, options) {
 }
 
 Common.downloadAllData = function() {
-    return Common.fetchEx("GET_PLAYER_DATA", {}, {}, {
+    let playerDataPomise = Common.fetchEx("GET_PLAYER_DATA", {}, {}, {
         method: "GET",
         headers: {
             "Content-Type": "application/json"
@@ -53,44 +51,46 @@ Common.downloadAllData = function() {
         }
     }).catch((error) => {
         console.error(`Failed to download Player data: ${error}`)
-    }).then(() => {
-        return Common.fetchEx("GET_EVENT_SUMMARY_DATA", {}, {}, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json"
-            }
-        })
+    })
+
+    let eventSummaryDataPromise = Common.fetchEx("GET_EVENT_SUMMARY_DATA", {}, {}, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json"
+        }
     }).then((data) => {
         MainStore.eventSummaryData = data.allEventSummaryData
 
         console.log("GET_EVENT_SUMMARY_DATA", data.allEventSummaryData)
     }).catch((error) => {
         console.error(`Failed to download Event data: ${error}`)
-    }).then(() => {
-        return Common.fetchEx("GET_RESULTS_DATA", {}, {}, {
+    })
+
+    let resultsDataPromise = Common.fetchEx("GET_RESULTS_DATA", {}, {}, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json"
             }
-        })
     }).then((data) => {
         MainStore.resultsData = data.results
         console.log("GET_RESULTS_DATA", data.results)
     }).catch((error) => {
         console.error(`Failed to download Results data: ${error}`)
-    }).then(() => {
-        return Common.fetchEx("GET_POINTS_DATA", {}, {}, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json"
-            }
-        })
+    })
+
+    let pointsDataPromise = Common.fetchEx("GET_POINTS_DATA", {}, {}, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json"
+        }
     }).then((data) => {
         console.log("GET_POINTS_DATA", data)
         MainStore.pointsData = data.data
     }).catch((error) => {
         console.error(`Failed to download points data: ${error}`)
     })
+
+    return Promise.all([playerDataPomise, eventSummaryDataPromise, resultsDataPromise, pointsDataPromise])
 }
 
 Common.makePoolKey = function(eventKey, divisionName, roundName, poolName) {
@@ -369,25 +369,9 @@ Common.getRoundNameFromId = function(id) {
     return Common.roundNames[id - 1]
 }
 
-Common.getPlayerStats = function(playerId) {
-
-    let openRanking = MainStore.pointsData["ranking-open"].find((data) => playerId === data.id)
-    let openRating = MainStore.pointsData["rating-open"].find((data) => playerId === data.id)
-
-    let winCount = 0
-    let eventCount = 0
+function getResultsWithPlayer(playerId) {
+    let resultsList = []
     for (let resultsData of Object.values(MainStore.resultsData)) {
-        let winningTeamData = resultsData.resultsData &&
-            resultsData.resultsData.round1 &&
-            resultsData.resultsData.round1.poolA &&
-            resultsData.resultsData.round1.poolA.teamData &&
-            resultsData.resultsData.round1.poolA.teamData[0]
-        if (winningTeamData !== undefined) {
-            if (winningTeamData.players.find((data) => data === playerId) !== undefined) {
-                ++winCount
-            }
-        }
-
         let found = false
         for (let roundKey in resultsData.resultsData) {
             if (roundKey.startsWith("round")) {
@@ -414,18 +398,165 @@ Common.getPlayerStats = function(playerId) {
             }
         }
 
-        if (found) {
-            ++eventCount
+        let eventSummaryData = MainStore.eventSummaryData[resultsData.eventId]
+        if (found && eventSummaryData && eventSummaryData.startDate !== undefined) {
+            resultsList.push(resultsData.key)
+        }
+    }
+
+    resultsList.sort((a, b) => {
+        return getEventStartDate(MainStore.resultsData[b].eventId) - getEventStartDate(MainStore.resultsData[a].eventId)
+    })
+
+    return resultsList
+}
+
+function getEventStartDate(eventKey) {
+    let eventSummaryData = MainStore.eventSummaryData[eventKey]
+    if (eventSummaryData === undefined) {
+        return new Date()
+    }
+
+    return new Date(eventSummaryData.startDate)
+}
+
+Common.getPlayerStats = function(playerId) {
+
+    let openRanking = MainStore.pointsData["ranking-open"].find((data) => playerId === data.id)
+    let openRating = MainStore.pointsData["rating-open"].find((data) => playerId === data.id)
+
+    let winCount = 0
+    let resultsList = getResultsWithPlayer(playerId)
+    for (let resultsDataKey of resultsList) {
+        let resultsData = MainStore.resultsData[resultsDataKey].resultsData
+        let winningTeamData = resultsData &&
+            resultsData.round1 &&
+            resultsData.round1.poolA &&
+            resultsData.round1.poolA.teamData &&
+            resultsData.round1.poolA.teamData[0]
+        if (winningTeamData !== undefined) {
+            if (winningTeamData.players.find((data) => data === playerId) !== undefined) {
+                ++winCount
+            }
         }
     }
 
     return {
-        eventCount: eventCount,
+        eventCount: resultsList.length,
         winCount: winCount,
         ranking: openRanking ? openRanking.rank : "N/A",
         rating: openRating ? Math.round(openRating.rating) : "N/A",
         highestRating: openRating ? Math.round(openRating.highestRating) : "N/A"
     }
+}
+
+Common.getPlayerEventDetails = function(playerId) {
+    let resultsList = getResultsWithPlayer(playerId)
+    let eventsDetails = resultsList.map((resultsKey) => {
+        let resultsData = MainStore.resultsData[resultsKey]
+        let eventSummaryData = MainStore.eventSummaryData[resultsData.eventId]
+        let placeAndTeam = findPlaceAndTeamInResults(resultsKey, playerId)
+        let details = {
+            eventName: resultsData.eventName,
+            divisionName: resultsData.divisionName,
+            place: placeAndTeam.place,
+            players: placeAndTeam.players,
+            startDate: eventSummaryData ? eventSummaryData.startDate : "",
+            eventId: resultsData.eventId
+        }
+
+        return details
+    })
+
+    return eventsDetails
+}
+
+function findPlaceAndTeamInResults(resultsKey, playerKey) {
+    let resultsData = MainStore.resultsData[resultsKey].resultsData
+    let roundIds = []
+    for (let roundId in resultsData) {
+        if (roundId.startsWith("round")) {
+            roundIds.push(roundId)
+        }
+    }
+
+    // Can't handle more than 9 rounds
+    roundIds = roundIds.sort((a, b) => {
+        return a - b
+    })
+
+    let loseTeams = new Set()
+    for (let roundId of roundIds) {
+        let roundData = resultsData[roundId]
+        let poolIds = []
+        for (let poolId in roundData) {
+            if (poolId.startsWith("pool")) {
+                poolIds.push(poolId)
+            }
+        }
+
+        let finishedPoolIds = new Set()
+        let teamIndex = 0
+        while (finishedPoolIds.size < poolIds.length) {
+            let addLoseTeams = []
+            for (let poolId of poolIds) {
+                if (finishedPoolIds.has(poolId)) {
+                    continue
+                }
+
+                let teamDataArray = roundData[poolId].teamData
+                if (teamIndex >= teamDataArray.length) {
+                    finishedPoolIds.add(poolId)
+                    continue
+                }
+
+                let teamData = teamDataArray[teamIndex]
+                if (isPlayerInTeam(playerKey, teamData))
+                {
+                    return {
+                        place: loseTeams.size + 1,
+                        players: teamData.players
+                    }
+                }
+
+                addLoseTeams.push(getTeamKey(teamData))
+            }
+
+            for (let teamKey of addLoseTeams) {
+                loseTeams.add(teamKey)
+            }
+
+            ++teamIndex
+        }
+    }
+
+    return 0
+}
+
+function getTeamKey(teamData) {
+    return teamData.players.join("-")
+}
+
+function isPlayerInTeam(playerKey, teamData) {
+    return teamData.players.find((data) => data === playerKey) !== undefined
+}
+
+Common.getOriginalPlayerData = function(playerKey) {
+    let playerData = MainStore.playerData[playerKey]
+    if (playerData === undefined) {
+        return undefined
+    }
+
+    while (playerData.aliasKey !== undefined) {
+        let originalData = MainStore.playerData[playerData.aliasKey]
+        if (originalData === undefined) {
+            break
+        }
+
+        playerData = originalData
+    }
+
+    return playerData
 }
 
 export default Common
