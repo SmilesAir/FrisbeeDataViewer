@@ -75,7 +75,7 @@ const EventViewer = observer(class EventViewer extends React.Component {
         })
 
         return (
-            <div key={poolData.poolId} className="pool">
+            <div key={poolData.poolId.toUpperCase()} className="pool">
                 <div className="poolHeader">Pool {poolData.poolId}</div>
                 <table>
                     <thead>
