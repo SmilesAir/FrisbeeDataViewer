@@ -73,11 +73,13 @@ Common.downloadAllData = function() {
         let eventSummaryOptions = []
         for (let eventKey in MainStore.eventSummaryData) {
             let data = MainStore.eventSummaryData[eventKey]
-            eventSummaryOptions.push({
-                value: eventKey,
-                label: data.eventName,
-                startDate: data.startDate
-            })
+            if (!data.isHidden) {
+                eventSummaryOptions.push({
+                    value: eventKey,
+                    label: data.eventName,
+                    startDate: data.startDate
+                })
+            }
         }
         eventSummaryOptions.sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
         MainStore.sortedEventSummaryOptions = eventSummaryOptions
@@ -201,24 +203,6 @@ Common.getSortedJudgeKeyArray = function(poolData) {
     return judges.map((data) => data.judgeKey)
 }
 
-Common.poolDataContainsCompetitor = function(poolData, competitorKey) {
-    if (poolData === undefined) {
-        return false
-    }
-
-    for (let teamData of poolData.teamData) {
-        if (teamData.players.find((key) => key === competitorKey) !== undefined) {
-            return true
-        }
-    }
-
-    return false
-}
-
-Common.poolDataContainsJudge = function(poolData, judgeKey) {
-    return poolData && poolData.judges[judgeKey] !== undefined
-}
-
 Common.getMissingDivisionName = function() {
     if (MainStore.eventData === undefined) {
         return undefined
@@ -270,26 +254,6 @@ Common.roundHasPools = function(divisionName, roundName) {
     }
 
     return false
-}
-
-Common.getPoolDataContainingPlayer = function(playerKey) {
-    for (let divisionName of Common.divisionNames) {
-        for (let roundName of Common.roundNames) {
-            for (let poolName of Common.poolNames) {
-                let poolData = Common.getPoolData(divisionName, roundName, poolName)
-                if (poolData !== undefined) {
-                    if (Common.poolDataContainsCompetitor(poolData, playerKey)) {
-                        return poolData
-                    }
-                    if (Common.poolDataContainsJudge(poolData, playerKey)) {
-                        return poolData
-                    }
-                }
-            }
-        }
-    }
-
-    return undefined
 }
 
 Common.getPoolData = function(divisionName, roundName, poolName) {
@@ -399,9 +363,35 @@ Common.getRoundNameFromId = function(id) {
     return Common.roundNames[id - 1]
 }
 
+function getAllPlayerIdsForPlayer(playerId) {
+    let playerData = MainStore.playerData[playerId]
+    if (playerData === undefined) {
+        return []
+    }
+
+    if (playerData.aliasKey !== undefined) {
+        return getAllPlayerIdsForPlayer(playerData.aliasKey)
+    }
+
+    let allIds = [ playerId ]
+    for (let otherPlayerData of Object.values(MainStore.playerData)) {
+        if (otherPlayerData.aliasKey === playerId) {
+            allIds.push(otherPlayerData.key)
+        }
+    }
+
+    return allIds
+}
+
 function getResultsWithPlayer(playerId) {
     let resultsList = []
+    let allKeys = getAllPlayerIdsForPlayer(playerId)
+
     for (let resultsData of Object.values(MainStore.resultsData)) {
+        if (resultsData.resultsData.isHidden) {
+            continue
+        }
+
         let found = false
         for (let roundKey in resultsData.resultsData) {
             if (roundKey.startsWith("round")) {
@@ -410,7 +400,7 @@ function getResultsWithPlayer(playerId) {
                     if (poolKey.startsWith("pool")) {
                         let poolData = roundData[poolKey]
                         for (let teamData of poolData.teamData) {
-                            if (teamData.players.find((data) => data === playerId)) {
+                            if (isPlayerInTeam(allKeys, teamData)) {
                                 found = true
                                 break
                             }
@@ -457,6 +447,7 @@ Common.getPlayerStats = function(playerId) {
 
     let winCount = 0
     let resultsList = getResultsWithPlayer(playerId)
+    let allKeys = getAllPlayerIdsForPlayer(playerId)
     for (let resultsDataKey of resultsList) {
         let resultsData = MainStore.resultsData[resultsDataKey].resultsData
         let winningTeamData = resultsData &&
@@ -465,7 +456,7 @@ Common.getPlayerStats = function(playerId) {
             resultsData.round1.poolA.teamData &&
             resultsData.round1.poolA.teamData[0]
         if (winningTeamData !== undefined) {
-            if (winningTeamData.players.find((data) => data === playerId) !== undefined) {
+            if (isPlayerInTeam(allKeys, winningTeamData)) {
                 ++winCount
             }
         }
@@ -515,6 +506,7 @@ function findPlaceAndTeamInResults(resultsKey, playerKey) {
         return a - b
     })
 
+    let allKeys = getAllPlayerIdsForPlayer(playerKey)
     let loseTeams = new Set()
     for (let roundId of roundIds) {
         let roundData = resultsData[roundId]
@@ -541,7 +533,7 @@ function findPlaceAndTeamInResults(resultsKey, playerKey) {
                 }
 
                 let teamData = teamDataArray[teamIndex]
-                if (isPlayerInTeam(playerKey, teamData))
+                if (isPlayerInTeam(allKeys, teamData))
                 {
                     return {
                         place: loseTeams.size + 1,
@@ -567,8 +559,8 @@ function getTeamKey(teamData) {
     return teamData.players.join("-")
 }
 
-function isPlayerInTeam(playerKey, teamData) {
-    return teamData.players.find((data) => data === playerKey) !== undefined
+function isPlayerInTeam(allKeys, teamData) {
+    return teamData.players.find((data) => allKeys.find((id) => id === data) !== undefined)
 }
 
 Common.getOriginalPlayerData = function(playerKey) {
@@ -587,6 +579,11 @@ Common.getOriginalPlayerData = function(playerKey) {
     }
 
     return playerData
+}
+
+Common.copyDirectLink = function(paramStr) {
+    let url = "https://freestylejudge.com/viewer" + paramStr
+    navigator.clipboard.writeText(url)
 }
 
 export default Common

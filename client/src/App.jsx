@@ -52,6 +52,10 @@ function getPlayersWidget(players, onclick) {
 const EventViewer = observer(class EventViewer extends React.Component {
     constructor() {
         super()
+
+        this.state = {
+            linkButtonText: "🔗"
+        }
     }
 
     onPlayerClick(e, playerKey) {
@@ -125,6 +129,10 @@ const EventViewer = observer(class EventViewer extends React.Component {
             return null
         }
 
+        if (resultsData.isHidden) {
+            return null
+        }
+
         let roundWidgets = []
         let roundKeys = []
         for (let key in resultsData) {
@@ -137,7 +145,7 @@ const EventViewer = observer(class EventViewer extends React.Component {
             roundWidgets.push(this.getRoundWidget(resultsData[key]))
         }
         return (
-            <div className="division">
+            <div key={resultsData.divisionName} className="division">
                 <div className="divisionHeader">
                     <button onClick={() => this.toggleCollapse(resultsData)}>{resultsData.open ? "V" : ">"}</button>
                     {resultsData.divisionName}
@@ -179,6 +187,14 @@ const EventViewer = observer(class EventViewer extends React.Component {
         })
     }
 
+    onLinkCopyClick(paramStr) {
+        Common.copyDirectLink(paramStr)
+        this.setState({ linkButtonText: "Link Copied" })
+        setTimeout(() => {
+            this.setState({ linkButtonText: "🔗" })
+        }, 2000)
+    }
+
     render() {
         let selectedEventValue = null
         let eventSummaryData = MainStore.eventSummaryData[MainStore.selectedEventKey]
@@ -191,7 +207,12 @@ const EventViewer = observer(class EventViewer extends React.Component {
 
         return (
             <div className="results">
-                <ReactSelect value={selectedEventValue} options={MainStore.sortedEventSummaryOptions} onChange={(e) => this.onSelectEventChanged(e)}/>
+                <div className="select">
+                    <div className="rs">
+                        <ReactSelect value={selectedEventValue} options={MainStore.sortedEventSummaryOptions} onChange={(e) => this.onSelectEventChanged(e)}/>
+                    </div>
+                    <button disabled={selectedEventValue === null} onClick={() => this.onLinkCopyClick(`?eventKey=${selectedEventValue.value}`)}>{this.state.linkButtonText}</button>
+                </div>
                 {this.getResultsWidget()}
             </div>
         )
@@ -201,6 +222,10 @@ const EventViewer = observer(class EventViewer extends React.Component {
 const PlayerViewer = observer(class PlayerViewer extends React.Component {
     constructor() {
         super()
+
+        this.state = {
+            linkButtonText: "🔗"
+        }
     }
 
     onPlayerClick(e, playerKey) {
@@ -325,6 +350,14 @@ const PlayerViewer = observer(class PlayerViewer extends React.Component {
         })
     }
 
+    onLinkCopyClick(paramStr) {
+        Common.copyDirectLink(paramStr)
+        this.setState({ linkButtonText: "Link Copied" })
+        setTimeout(() => {
+            this.setState({ linkButtonText: "🔗" })
+        }, 2000)
+    }
+
     render() {
         if (MainStore.inited !== true) {
             return null
@@ -350,9 +383,16 @@ const PlayerViewer = observer(class PlayerViewer extends React.Component {
             }
         }
 
+        playerOptions.sort((a, b) => a.label.localeCompare(b.label))
+
         return (
             <div>
-                <ReactSelect value={selectedPlayerValue} options={playerOptions} onChange={(e) => this.onSelectPlayerChanged(e)}/>
+                <div className="select">
+                    <div className="rs">
+                        <ReactSelect value={selectedPlayerValue} options={playerOptions} onChange={(e) => this.onSelectPlayerChanged(e)}/>
+                    </div>
+                    <button disabled={selectedPlayerValue === null} onClick={() => this.onLinkCopyClick(`?playerKey=${selectedPlayerValue.value}`)}>{this.state.linkButtonText}</button>
+                </div>
                 {this.getPlayerStatsWidget(MainStore.selectedPlayerKey)}
                 {this.getPlayerEventsWidget(MainStore.selectedPlayerKey)}
             </div>

@@ -41,6 +41,8 @@ body {
 }
 
 .viewerTop {
+    max-width: 80em;
+
     a:visited{
         color:blue;
     }
@@ -53,6 +55,16 @@ body {
         border-collapse: collapse; 
         table-layout: auto;
         width: auto;
+    }
+
+    .select {
+        display: flex;
+        flex-direction: row;
+        justify-content: stretch;
+
+        .rs {
+            min-width: 25em;
+        }
     }
 
     .results {
