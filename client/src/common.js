@@ -70,20 +70,6 @@ Common.downloadAllData = function() {
     }).then((data) => {
         MainStore.eventSummaryData = data.allEventSummaryData
 
-        let eventSummaryOptions = []
-        for (let eventKey in MainStore.eventSummaryData) {
-            let data = MainStore.eventSummaryData[eventKey]
-            if (!data.isHidden) {
-                eventSummaryOptions.push({
-                    value: eventKey,
-                    label: data.eventName,
-                    startDate: data.startDate
-                })
-            }
-        }
-        eventSummaryOptions.sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
-        MainStore.sortedEventSummaryOptions = eventSummaryOptions
-
         console.log("GET_EVENT_SUMMARY_DATA", data.allEventSummaryData)
         runInAction(() => {
             ++MainStore.initCount
@@ -122,7 +108,20 @@ Common.downloadAllData = function() {
         console.error(`Failed to download points data: ${error}`)
     })
 
-    return Promise.all([playerDataPomise, eventSummaryDataPromise, resultsDataPromise, pointsDataPromise])
+    return Promise.all([playerDataPomise, eventSummaryDataPromise, resultsDataPromise, pointsDataPromise]).then(() => {
+        let eventDetails = Common.getEventListDetails()
+        let list = []
+        for (let data of eventDetails) {
+            if (data.playerRoster.size > 0) {
+                list.push({
+                    value: data.eventId,
+                    label: data.eventName,
+                    startDate: data.startDate
+                })
+            }
+        }
+        MainStore.sortedEventSummaryOptions = list
+    })
 }
 
 Common.makePoolKey = function(eventKey, divisionName, roundName, poolName) {
@@ -304,34 +303,6 @@ Common.getTeamRankingPointsByDivision = function(playerKeys, divisionName) {
 
     return sum
 }
-
-// Common.getSimilarPlayerDataByName = function(name, nameList) {
-//     let bestNames = []
-//     const maxCount = 10
-//     for (let cachedName of nameList) {
-//         let similar = StringSimilarity.compareTwoStrings(name, cachedName)
-//         if (similar > 0) {
-//             if (bestNames.length < maxCount || similar > bestNames[maxCount - 1].score) {
-//                 let index = bestNames.findIndex((data) => data.score < similar)
-//                 bestNames.splice(index >= 0 ? index : bestNames.length, 0, {
-//                     name: cachedName,
-//                     score: similar
-//                 })
-
-//                 if (bestNames.length > maxCount) {
-//                     bestNames.pop()
-//                 }
-//             }
-//         }
-//     }
-
-//     let playerDatas = []
-//     for (let data of bestNames) {
-//         playerDatas.push(Common.findPlayerByFullName(data.name))
-//     }
-
-//     return playerDatas
-// }
 
 Common.getPlaceFromNumber = function(number) {
     switch (number) {
@@ -526,7 +497,9 @@ function findPlaceAndTeamInResults(resultsKey, playerKey) {
                     continue
                 }
 
-                let teamDataArray = roundData[poolId].teamData
+                let teamDataArray = roundData[poolId].teamData.slice().sort((a, b) => {
+                    return a.place - b.place
+                })
                 if (teamIndex >= teamDataArray.length) {
                     finishedPoolIds.add(poolId)
                     continue
@@ -584,6 +557,50 @@ Common.getOriginalPlayerData = function(playerKey) {
 Common.copyDirectLink = function(paramStr) {
     let url = "https://freestylejudge.com/viewer" + paramStr
     navigator.clipboard.writeText(url)
+}
+
+Common.getEventListDetails = function() {
+    let eventList = []
+    for (let eventSummaryData of Object.values(MainStore.eventSummaryData)) {
+        eventList.push({
+            eventId: eventSummaryData.key,
+            startDate: eventSummaryData.startDate,
+            eventName: eventSummaryData.eventName,
+            playerRoster: new Set()
+        })
+    }
+    for (let resultsData of Object.values(MainStore.resultsData)) {
+        if (resultsData.resultsData.isHidden) {
+            continue
+        }
+
+        let eventDetails = eventList.find((data) => data.eventId === resultsData.eventId)
+        if (eventDetails === undefined) {
+            continue
+        }
+
+        for (let roundKey in resultsData.resultsData) {
+            if (roundKey.startsWith("round")) {
+                let roundData = resultsData.resultsData[roundKey]
+                for (let poolKey in roundData) {
+                    if (poolKey.startsWith("pool")) {
+                        let poolData = roundData[poolKey]
+                        for (let teamData of poolData.teamData) {
+                            for (let playerId of teamData.players) {
+                                eventDetails.playerRoster.add(playerId)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    eventList.sort((a, b) => {
+        return getEventStartDate(b.eventId) - getEventStartDate(a.eventId)
+    })
+
+    return eventList
 }
 
 export default Common

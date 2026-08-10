@@ -393,13 +393,65 @@ const PlayerViewer = observer(class PlayerViewer extends React.Component {
                     </div>
                     <button disabled={selectedPlayerValue === null} onClick={() => this.onLinkCopyClick(`?playerKey=${selectedPlayerValue.value}`)}>{this.state.linkButtonText}</button>
                 </div>
+                <h2>Player Stats</h2>
                 {this.getPlayerStatsWidget(MainStore.selectedPlayerKey)}
+                <br/>
+                <hr/>
+                <h2>Event History</h2>
                 {this.getPlayerEventsWidget(MainStore.selectedPlayerKey)}
             </div>
         )
     }
 })
 
+const EventListViewer = observer(class EventViewer extends React.Component {
+    constructor() {
+        super()
+    }
+
+    onClickEvent(e, eventKey) {
+        e.preventDefault()
+
+        runInAction(() => {
+            MainStore.selectedEventKey = eventKey
+            MainStore.topTabSelectedIndex = 1
+        })
+    }
+
+    render() {
+        let eventDetails = Common.getEventListDetails()
+        let rows = eventDetails.map((data) => {
+            if (data.playerRoster.size > 0) {
+                return (
+                    <tr key={Math.random()}>
+                        <td>{data.startDate}</td>
+                        <td><a key={data} href="" onClick={(e) => this.onClickEvent(e, data.eventId)}>{data.eventName}</a></td>
+                        <td>{data.playerRoster.size}</td>
+                    </tr>
+                )
+            }
+
+            return undefined
+        })
+
+        return (
+            <div className="eventList">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Start Date</th>
+                            <th>Event Name</th>
+                            <th># of Players</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows}
+                    </tbody>
+                </table>
+            </div>
+        )
+    }
+})
 
 const App = observer(class App extends React.Component {
     constructor() {
@@ -418,7 +470,9 @@ const App = observer(class App extends React.Component {
             let eventKey = url.searchParams.get("eventKey")
             if (eventKey) {
                 topTabSelectedIndex = 1
-                MainStore.selectedEventKey = eventKey
+                runInAction(() => {
+                    MainStore.selectedEventKey = eventKey
+                })
             }
         }
 
@@ -470,12 +524,16 @@ const App = observer(class App extends React.Component {
                     <TabList>
                         <Tab>Players</Tab>
                         <Tab>Events</Tab>
+                        <Tab>Event List</Tab>
                     </TabList>
                     <TabPanel>
                         <PlayerViewer/>
                     </TabPanel>
                     <TabPanel>
                         <EventViewer/>
+                    </TabPanel>
+                    <TabPanel>
+                        <EventListViewer/>
                     </TabPanel>
                 </Tabs>
             </div>
